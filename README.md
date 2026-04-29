@@ -83,6 +83,14 @@ To backfill incorrect-example activations from existing generations without reru
 bash slurm/submit_backfill_pipeline.sh
 ```
 
+To generate residual-stream trajectory dimensionality-reduction plots with correctness coloring:
+
+```bash
+python scripts/plot_trajectory_dr.py --output-dir outputs/gemma4_e2b --max-per-group 75
+```
+
+This writes separate PCA and Isomap plots to `outputs/gemma4_e2b/plots/`, with one panel per task.
+
 ## Tests
 
 Unit tests do not download Gemma:

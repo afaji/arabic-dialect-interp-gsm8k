@@ -7,7 +7,7 @@ from .aggregate import aggregate_inference, combine_metric_csvs
 from .backfill import backfill_incorrect_activations_for_task
 from .geometry import compute_metrics_for_activation_file
 from .inference import run_inference_for_task
-from .plotting import plot_results
+from .plotting import plot_results, plot_trajectory_dr
 from .tasks import TASKS
 
 
@@ -102,6 +102,23 @@ def plot_results_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output-dir", default="outputs/gemma4_e2b")
     args = parser.parse_args(argv)
     plot_results(args.output_dir)
+
+
+def plot_trajectory_dr_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Plot PCA/Isomap residual-stream trajectories with correctness coloring.")
+    parser.add_argument("--output-dir", default="outputs/gemma4_e2b")
+    parser.add_argument("--max-per-group", type=int, default=75)
+    parser.add_argument("--random-seed", type=int, default=0)
+    parser.add_argument("--isomap-neighbors", type=int, default=12)
+    parser.add_argument("--no-layer-normalize", action="store_true")
+    args = parser.parse_args(argv)
+    plot_trajectory_dr(
+        output_dir=args.output_dir,
+        max_per_group=args.max_per_group,
+        random_seed=args.random_seed,
+        isomap_neighbors=args.isomap_neighbors,
+        normalize_layers=not args.no_layer_normalize,
+    )
 
 
 def run_all_main(argv: list[str] | None = None) -> None:

@@ -27,6 +27,7 @@ gcs-run-inference = "geometric_complexity_scaling.cli:run_inference_main"
 gcs-backfill-incorrect-activations = "geometric_complexity_scaling.cli:backfill_incorrect_activations_main"
 gcs-compute-metrics = "geometric_complexity_scaling.cli:compute_metrics_main"
 gcs-plot-results = "geometric_complexity_scaling.cli:plot_results_main"
+gcs-plot-trajectory-dr = "geometric_complexity_scaling.cli:plot_trajectory_dr_main"
 gcs-run-all = "geometric_complexity_scaling.cli:run_all_main"
 
 [tool.setuptools.packages.find]
