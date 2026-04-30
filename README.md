@@ -91,7 +91,7 @@ python scripts/plot_trajectory_dr.py --output-dir outputs/gemma4_e2b --max-per-g
 
 This writes separate PCA and Isomap plots to `outputs/gemma4_e2b/plots/`, with one panel per task.
 
-## Professor Workflow: GSM8K-Like Data To PCA Trajectory Plot
+## Workflow: GSM8K-Like Data To PCA Trajectory Plot
 
 Use this path when you have a model and a GSM8K-like math dataset and want a residual-stream PCA trajectory plot colored by correctness.
 
@@ -119,7 +119,7 @@ python scripts/plot_custom_math_pca_trajectory.py \
   --data-file /path/to/math_data.jsonl \
   --question-column question \
   --answer-column answer \
-  --output-dir outputs/prof_math_demo \
+  --output-dir outputs/math_demo \
   --sample-size 200 \
   --max-per-group 75 \
   --dtype bfloat16
@@ -133,7 +133,7 @@ python scripts/plot_custom_math_pca_trajectory.py \
   --dataset-name openai/gsm8k \
   --dataset-config main \
   --split train \
-  --output-dir outputs/prof_gsm8k_demo \
+  --output-dir outputs/gsm8k_demo \
   --sample-size 200 \
   --max-per-group 75 \
   --dtype bfloat16
@@ -147,7 +147,7 @@ The workflow is environment-agnostic. If a machine needs explicit cache paths, p
 python scripts/plot_custom_math_pca_trajectory.py \
   --model-id google/gemma-4-E2B-it \
   --data-file /path/to/math_data.jsonl \
-  --output-dir outputs/prof_math_demo \
+  --output-dir outputs/math_demo \
   --hf-home /scratch/$USER/.cache/huggingface \
   --datasets-cache /scratch/$USER/.cache/huggingface/datasets \
   --transformers-cache /scratch/$USER/.cache/huggingface/transformers \
@@ -158,11 +158,11 @@ These flags set `HF_HOME`, `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, and `MPLCO
 
 ### Outputs
 
-For `--output-dir outputs/prof_math_demo`, the command writes:
+For `--output-dir outputs/math_demo`, the command writes:
 
-- `outputs/prof_math_demo/inference/custom_math_seed0.jsonl`: prompts, model outputs, parsed numeric answers, gold answers, correctness, and token metadata.
-- `outputs/prof_math_demo/activations/custom_math_seed0_all_activations.npz`: final-generated-token residual-stream activations across layers.
-- `outputs/prof_math_demo/plots/custom_math_trajectory_pca_correctness.png`: PCA trajectory plot.
+- `outputs/math_demo/inference/custom_math_seed0.jsonl`: prompts, model outputs, parsed numeric answers, gold answers, correctness, and token metadata.
+- `outputs/math_demo/activations/custom_math_seed0_all_activations.npz`: final-generated-token residual-stream activations across layers.
+- `outputs/math_demo/plots/custom_math_trajectory_pca_correctness.png`: PCA trajectory plot.
 
 The plot treats each example as a residual-stream trajectory through layers. Green lines are correct examples, red lines are incorrect examples, circles mark the first layer state, squares mark the final layer state, and darker segments indicate later layer progression. Layers are normalized before PCA by default; pass `--no-layer-normalize` to disable that.
 
