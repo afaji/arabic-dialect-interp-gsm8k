@@ -56,5 +56,12 @@ def test_sentiment_and_math_correctness():
     assert is_correct("math", "1234", "1234")
 
 
+def test_math_parsing_and_scoring_supports_arabic_indic_digits():
+    target = target_for_row("math", {"answer": "#### ١٬٢٣٤"})
+    assert target == "1234"
+    assert parse_answer("math", "الإجابة النهائية: ١٬٢٣٤") == "1234"
+    assert is_correct("math", "١٢٫٥", "12.5")
+
+
 def test_clean_short_answer_strips_special_tokens_and_prefixes():
     assert clean_short_answer("<end_of_turn>\nFinal answer: York.") == "York."

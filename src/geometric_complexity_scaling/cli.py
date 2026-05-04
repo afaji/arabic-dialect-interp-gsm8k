@@ -5,10 +5,10 @@ from pathlib import Path
 
 from .aggregate import aggregate_inference, combine_metric_csvs
 from .backfill import backfill_incorrect_activations_for_task
-from .custom_math import run_custom_math_pca_trajectory
+from .custom_math import parse_row_filters, run_custom_math_pca_trajectory
 from .geometry import compute_metrics_for_activation_file
 from .inference import run_inference_for_task
-from .plotting import plot_results, plot_trajectory_dr
+from .plotting import plot_custom_pca_trajectory_gallery, plot_results, plot_trajectory_dr
 from .tasks import TASKS
 
 
@@ -135,10 +135,12 @@ def custom_math_pca_trajectory_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--question-column", default="question")
     parser.add_argument("--answer-column", default="answer")
     parser.add_argument("--row-id-column", default=None)
+    parser.add_argument("--row-filter", action="append", default=[], help="Exact-match filter in COLUMN=VALUE form.")
+    parser.add_argument("--run-name", default=None)
     parser.add_argument("--output-dir", default="outputs/custom_math")
     parser.add_argument("--sample-size", type=int, default=200)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--dtype", default="auto", choices=["auto", "float16", "bfloat16", "float32"])
     parser.add_argument("--device-map", default="auto")
     parser.add_argument("--geometry-dtype", default="float16", choices=["float16", "float32"])
@@ -146,6 +148,7 @@ def custom_math_pca_trajectory_main(argv: list[str] | None = None) -> None:
     parser.add_argument("--no-layer-normalize", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--hf-home", default=None)
+    parser.add_argument("--hf-token", default=None)
     parser.add_argument("--datasets-cache", default=None)
     parser.add_argument("--transformers-cache", default=None)
     parser.add_argument("--mpl-cache", default=None)
@@ -160,6 +163,7 @@ def custom_math_pca_trajectory_main(argv: list[str] | None = None) -> None:
         question_column=args.question_column,
         answer_column=args.answer_column,
         row_id_column=args.row_id_column,
+        row_filters=parse_row_filters(args.row_filter),
         sample_size=args.sample_size,
         seed=args.seed,
         max_new_tokens=args.max_new_tokens,
@@ -170,9 +174,36 @@ def custom_math_pca_trajectory_main(argv: list[str] | None = None) -> None:
         normalize_layers=not args.no_layer_normalize,
         overwrite=args.overwrite,
         hf_home=args.hf_home,
+        hf_token=args.hf_token,
         datasets_cache=args.datasets_cache,
         transformers_cache=args.transformers_cache,
         mpl_cache=args.mpl_cache,
+        run_name=args.run_name,
+    )
+
+
+def custom_math_postprocess_plots_main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Regenerate custom math PCA plot galleries from saved activation files without rerunning inference."
+    )
+    parser.add_argument("--all-replacement-activation", required=True)
+    parser.add_argument("--no-replacement-activation", required=True)
+    parser.add_argument("--output-dir", default="outputs/custom_math")
+    parser.add_argument("--plot-prefix", default=None)
+    parser.add_argument("--max-per-group", type=int, default=75, help="Per-label cap. Use 0 to keep all examples.")
+    parser.add_argument("--random-seed", type=int, default=0)
+    parser.add_argument("--no-layer-normalize", action="store_true")
+    args = parser.parse_args(argv)
+    plot_custom_pca_trajectory_gallery(
+        activation_specs=[
+            ("no replacement", args.no_replacement_activation),
+            ("all replacement", args.all_replacement_activation),
+        ],
+        output_dir=args.output_dir,
+        plot_prefix=args.plot_prefix,
+        max_per_group=args.max_per_group,
+        random_seed=args.random_seed,
+        normalize_layers=not args.no_layer_normalize,
     )
 
 

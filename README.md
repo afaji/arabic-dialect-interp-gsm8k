@@ -139,6 +139,64 @@ python scripts/plot_custom_math_pca_trajectory.py \
   --dtype bfloat16
 ```
 
+### Private Hugging Face Dataset With Subsets And Filters
+
+If the dataset is private, either export `HF_TOKEN` first or pass `--hf-token` directly. Exact-match row filters are supported with repeatable `--row-filter COLUMN=VALUE` flags.
+
+For `afaji/ArabicGSM8k`, a good lightweight first pass is `Qwen/Qwen3-0.6B`. The two subset runs you asked for look like this:
+
+```bash
+python scripts/plot_custom_math_pca_trajectory.py \
+  --model-id Qwen/Qwen3-0.6B \
+  --dataset-name afaji/ArabicGSM8k \
+  --dataset-config "all replacement" \
+  --split test \
+  --row-filter dialect=EGY \
+  --hf-token "$HF_TOKEN" \
+  --output-dir outputs/arabic_gsm8k \
+  --sample-size 200 \
+  --max-new-tokens 512 \
+  --max-per-group 75 \
+  --dtype float32 \
+  --device-map cpu
+
+python scripts/plot_custom_math_pca_trajectory.py \
+  --model-id Qwen/Qwen3-0.6B \
+  --dataset-name afaji/ArabicGSM8k \
+  --dataset-config "no replacement" \
+  --split test \
+  --row-filter dialect=EGY \
+  --hf-token "$HF_TOKEN" \
+  --output-dir outputs/arabic_gsm8k \
+  --sample-size 200 \
+  --max-new-tokens 512 \
+  --max-per-group 75 \
+  --dtype float32 \
+  --device-map cpu
+```
+
+If you prefer an instruction-tuned fallback closer to 0.5B, `Qwen/Qwen2.5-0.5B-Instruct` is also a reasonable option. The custom math CLI now defaults to `--max-new-tokens 512`, logs `hit_max_new_tokens` in each JSONL row, and when both replacement subsets for the same seed are present it writes a postprocessed PCA gallery from the saved activations:
+
+- per-subset correctness plots with each subset fit in its own PCA basis
+- a 4-line shared-basis comparison plot: `no replacement correct`, `no replacement incorrect`, `all replacement correct`, `all replacement incorrect`
+- a 2-line shared-basis plot comparing only `all replacement` vs `no replacement`
+- a 2-line shared-basis plot comparing only `correct` vs `incorrect`
+- a 2-line shared-basis plot restricted to rows where both settings produce the same final answer
+- a 2-line shared-basis plot restricted to rows where the settings produce different final answers
+
+To regenerate that gallery later without rerunning inference:
+
+```bash
+python scripts/plot_custom_math_postprocess.py \
+  --all-replacement-activation outputs/arabic_gsm8k/activations/custom_math_all-replacement_dialect-egy_seed0_all_activations.npz \
+  --no-replacement-activation outputs/arabic_gsm8k/activations/custom_math_no-replacement_dialect-egy_seed0_all_activations.npz \
+  --output-dir outputs/arabic_gsm8k \
+  --plot-prefix custom_math_seed0_dialect-egy \
+  --max-per-group 75
+```
+
+Use `--max-per-group 0` to keep every saved example in each label group.
+
 ### Cache Directories
 
 The workflow is environment-agnostic. If a machine needs explicit cache paths, pass them directly:
@@ -156,6 +214,21 @@ python scripts/plot_custom_math_pca_trajectory.py \
 
 These flags set `HF_HOME`, `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, and `MPLCONFIGDIR` for the run. If omitted, the standard library defaults are used.
 
+### One-Command ArabicGSM8k EGY Run
+
+For a collaborator with a GPU who just needs to run both replacement settings and get the full postprocessed gallery in one shot, use:
+
+```bash
+PYTHONPATH=src python3 scripts/run_arabic_gsm8k_egy_pair.py \
+  --hf-token "$HF_TOKEN" \
+  --model-id Qwen/Qwen2.5-7B-Instruct \
+  --dtype float16 \
+  --device-map auto \
+  --output-dir outputs/arabic_gsm8k_qwen2_5_7b
+```
+
+This runs both `all replacement` and `no replacement` for `dialect=EGY`, then writes the merged and postprocessed PCA plots automatically.
+
 ### Outputs
 
 For `--output-dir outputs/math_demo`, the command writes:
@@ -163,6 +236,7 @@ For `--output-dir outputs/math_demo`, the command writes:
 - `outputs/math_demo/inference/custom_math_seed0.jsonl`: prompts, model outputs, parsed numeric answers, gold answers, correctness, and token metadata.
 - `outputs/math_demo/activations/custom_math_seed0_all_activations.npz`: final-generated-token residual-stream activations across layers.
 - `outputs/math_demo/plots/custom_math_trajectory_pca_correctness.png`: PCA trajectory plot.
+- when paired replacement subsets exist, additional postprocessed gallery plots are written under `outputs/.../plots/`.
 
 The plot treats each example as a residual-stream trajectory through layers. Green lines are correct examples, red lines are incorrect examples, circles mark the first layer state, squares mark the final layer state, and darker segments indicate later layer progression. Layers are normalized before PCA by default; pass `--no-layer-normalize` to disable that.
 

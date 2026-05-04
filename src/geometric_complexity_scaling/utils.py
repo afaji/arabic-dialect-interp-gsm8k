@@ -10,6 +10,37 @@ from typing import Any, Iterable
 import numpy as np
 import torch
 
+UNICODE_DIGIT_TRANSLATION = str.maketrans(
+    {
+        "٠": "0",
+        "١": "1",
+        "٢": "2",
+        "٣": "3",
+        "٤": "4",
+        "٥": "5",
+        "٦": "6",
+        "٧": "7",
+        "٨": "8",
+        "٩": "9",
+        "۰": "0",
+        "۱": "1",
+        "۲": "2",
+        "۳": "3",
+        "۴": "4",
+        "۵": "5",
+        "۶": "6",
+        "۷": "7",
+        "۸": "8",
+        "۹": "9",
+        "٫": ".",
+        "٬": ",",
+        "،": ",",
+        "−": "-",
+        "–": "-",
+        "—": "-",
+    }
+)
+
 
 def require_import(module_name: str, package_hint: str | None = None) -> Any:
     try:
@@ -55,8 +86,12 @@ def json_safe(value: Any) -> Any:
         return str(value)
 
 
+def canonicalize_numeric_text(text: Any) -> str:
+    return ("" if text is None else str(text)).translate(UNICODE_DIGIT_TRANSLATION)
+
+
 def normalize_text(text: Any) -> str:
-    text = "" if text is None else str(text)
+    text = canonicalize_numeric_text(text)
     text = text.lower().strip()
     text = re.sub(r"[^a-z0-9.\-/% ]+", " ", text)
     text = re.sub(r"\b(the|a|an)\b", " ", text)
@@ -73,7 +108,7 @@ def extract_first_label(text: str, labels: set[str]) -> str:
 
 
 def extract_final_number(text: str) -> str | None:
-    matches = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", str(text))
+    matches = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", canonicalize_numeric_text(text))
     if not matches:
         return None
     return matches[-1].replace(",", "")
@@ -82,10 +117,12 @@ def extract_final_number(text: str) -> str | None:
 def numbers_equal(pred: str | None, gold: str | None, atol: float = 1e-6) -> bool:
     if pred is None or gold is None:
         return False
+    pred_text = canonicalize_numeric_text(pred)
+    gold_text = canonicalize_numeric_text(gold)
     try:
-        return abs(float(pred) - float(gold)) <= atol
+        return abs(float(pred_text) - float(gold_text)) <= atol
     except ValueError:
-        return normalize_text(pred) == normalize_text(gold)
+        return normalize_text(pred_text) == normalize_text(gold_text)
 
 
 def seed_everything(seed: int) -> None:

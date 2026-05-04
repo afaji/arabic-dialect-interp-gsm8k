@@ -19,3 +19,5 @@ def test_console_script_files_exist():
     assert Path("scripts/run_inference.py").exists()
     assert Path("scripts/compute_metrics.py").exists()
     assert Path("scripts/plot_results.py").exists()
+    assert Path("scripts/plot_custom_math_postprocess.py").exists()
+    assert Path("scripts/run_arabic_gsm8k_egy_pair.py").exists()
