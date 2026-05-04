@@ -1,222 +1,28 @@
-# Geometric Complexity Scaling
+# Arabic Dialect GSM8K Residual-Stream Pipeline
 
-This project tests whether task complexity induces increasingly nonlinear residual-stream geometry in `google/gemma-4-E2B-it`.
+This repo is currently set up for one workflow:
 
-The suite runs three tasks over 3 random seeds, samples 2,000 rows per task/seed before inference, filters to correct answers, computes geometry metrics on the retained activations, and plots mean/std error bars.
-
-## Tasks
-
-- **Type I, fact retrieval:** `mandarjoshi/trivia_qa`, using `question` and answer aliases.
-- **Type II, sentiment:** `SetFit/sst2`, using `text` and `label_text`.
-- **Type III, math reasoning:** `openai/gsm8k` with config `main`, using `question` and `answer`.
+- run `Qwen` on `afaji/ArabicGSM8k`
+- filter to `dialect=EGY`
+- run both subsets:
+  - `all replacement`
+  - `no replacement`
+- save model outputs, residual-stream activations, and PCA comparison plots
 
 ## Install
 
-Recommended Conda setup:
-
 ```bash
-conda env create -f environment.yml
-conda activate geometric-complexity-scaling
-python -m pip install -e .
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -U pip
+pip install -e .
 ```
 
-Cluster/local-prefix setup, matching this workspace:
+You need a Hugging Face token with access to `afaji/ArabicGSM8k`.
 
-```bash
-conda env create -p /scratch/afz225/res_stream_project/.conda-env -f environment.yml
-conda activate /scratch/afz225/res_stream_project/.conda-env
-python -m pip install -e . --no-build-isolation
-```
+## Main Run
 
-For pip-only environments:
-
-```bash
-python -m pip install -e .
-```
-
-You may also need to authenticate with Hugging Face if the Gemma checkpoint requires gated access:
-
-```bash
-huggingface-cli login
-```
-
-## Run
-
-Small smoke test:
-
-```bash
-gcs-run-all --sample-size 5 --max-correct-geometry 5 --max-new-tokens 64 --output-dir outputs/smoke
-```
-
-Full planned run:
-
-```bash
-gcs-run-all --sample-size 2000 --seeds 0 1 2 --output-dir outputs/gemma4_e2b
-```
-
-## HPC Slurm Run
-
-The full HPC pipeline uses a Slurm array over the 9 `(task, seed)` combinations and caps concurrency at 4 GPU jobs:
-
-```bash
-bash slurm/submit_pipeline.sh
-```
-
-This submits:
-
-- `slurm/run_inference_array.sbatch`: `#SBATCH --array=0-8%4`, one GPU per array task.
-- `slurm/run_postprocess.sbatch`: computes metrics and visualizations after the inference array succeeds.
-
-Manual submission:
-
-```bash
-INFER_JOB=$(sbatch --parsable slurm/run_inference_array.sbatch)
-sbatch --dependency=afterok:${INFER_JOB} slurm/run_postprocess.sbatch
-```
-
-Logs are written to `slurm/logs/`; outputs are written to `outputs/gemma4_e2b/`.
-Hugging Face caches are read/written under `/scratch/afz225/.cache`.
-
-To backfill incorrect-example activations from existing generations without rerunning generation:
-
-```bash
-bash slurm/submit_backfill_pipeline.sh
-```
-
-To generate residual-stream trajectory dimensionality-reduction plots with correctness coloring:
-
-```bash
-python scripts/plot_trajectory_dr.py --output-dir outputs/gemma4_e2b --max-per-group 75
-```
-
-This writes separate PCA and Isomap plots to `outputs/gemma4_e2b/plots/`, with one panel per task.
-
-## Workflow: GSM8K-Like Data To PCA Trajectory Plot
-
-Use this path when you have a model and a GSM8K-like math dataset and want a residual-stream PCA trajectory plot colored by correctness.
-
-The input data must have one problem column and one gold-answer column. By default, the expected columns are:
-
-```json
-{"question": "Jan has 3 apples and buys 4 more. How many apples?", "answer": "#### 7"}
-{"question": "A box has 12 pens split equally among 3 students. How many each?", "answer": "#### 4"}
-```
-
-CSV files with the same columns are also supported:
-
-```csv
-question,answer
-"Jan has 3 apples and buys 4 more. How many apples?","#### 7"
-```
-
-If your columns have different names, pass `--question-column` and `--answer-column`.
-
-### Local JSONL/CSV Data
-
-```bash
-python scripts/plot_custom_math_pca_trajectory.py \
-  --model-id google/gemma-4-E2B-it \
-  --data-file /path/to/math_data.jsonl \
-  --question-column question \
-  --answer-column answer \
-  --output-dir outputs/math_demo \
-  --sample-size 200 \
-  --max-per-group 75 \
-  --dtype bfloat16
-```
-
-### Hugging Face Dataset
-
-```bash
-python scripts/plot_custom_math_pca_trajectory.py \
-  --model-id google/gemma-4-E2B-it \
-  --dataset-name openai/gsm8k \
-  --dataset-config main \
-  --split train \
-  --output-dir outputs/gsm8k_demo \
-  --sample-size 200 \
-  --max-per-group 75 \
-  --dtype bfloat16
-```
-
-### Private Hugging Face Dataset With Subsets And Filters
-
-If the dataset is private, either export `HF_TOKEN` first or pass `--hf-token` directly. Exact-match row filters are supported with repeatable `--row-filter COLUMN=VALUE` flags.
-
-For `afaji/ArabicGSM8k`, a good lightweight first pass is `Qwen/Qwen3-0.6B`. The two subset runs you asked for look like this:
-
-```bash
-python scripts/plot_custom_math_pca_trajectory.py \
-  --model-id Qwen/Qwen3-0.6B \
-  --dataset-name afaji/ArabicGSM8k \
-  --dataset-config "all replacement" \
-  --split test \
-  --row-filter dialect=EGY \
-  --hf-token "$HF_TOKEN" \
-  --output-dir outputs/arabic_gsm8k \
-  --sample-size 200 \
-  --max-new-tokens 512 \
-  --max-per-group 75 \
-  --dtype float32 \
-  --device-map cpu
-
-python scripts/plot_custom_math_pca_trajectory.py \
-  --model-id Qwen/Qwen3-0.6B \
-  --dataset-name afaji/ArabicGSM8k \
-  --dataset-config "no replacement" \
-  --split test \
-  --row-filter dialect=EGY \
-  --hf-token "$HF_TOKEN" \
-  --output-dir outputs/arabic_gsm8k \
-  --sample-size 200 \
-  --max-new-tokens 512 \
-  --max-per-group 75 \
-  --dtype float32 \
-  --device-map cpu
-```
-
-If you prefer an instruction-tuned fallback closer to 0.5B, `Qwen/Qwen2.5-0.5B-Instruct` is also a reasonable option. The custom math CLI now defaults to `--max-new-tokens 512`, logs `hit_max_new_tokens` in each JSONL row, and when both replacement subsets for the same seed are present it writes a postprocessed PCA gallery from the saved activations:
-
-- per-subset correctness plots with each subset fit in its own PCA basis
-- a 4-line shared-basis comparison plot: `no replacement correct`, `no replacement incorrect`, `all replacement correct`, `all replacement incorrect`
-- a 2-line shared-basis plot comparing only `all replacement` vs `no replacement`
-- a 2-line shared-basis plot comparing only `correct` vs `incorrect`
-- a 2-line shared-basis plot restricted to rows where both settings produce the same final answer
-- a 2-line shared-basis plot restricted to rows where the settings produce different final answers
-
-To regenerate that gallery later without rerunning inference:
-
-```bash
-python scripts/plot_custom_math_postprocess.py \
-  --all-replacement-activation outputs/arabic_gsm8k/activations/custom_math_all-replacement_dialect-egy_seed0_all_activations.npz \
-  --no-replacement-activation outputs/arabic_gsm8k/activations/custom_math_no-replacement_dialect-egy_seed0_all_activations.npz \
-  --output-dir outputs/arabic_gsm8k \
-  --plot-prefix custom_math_seed0_dialect-egy \
-  --max-per-group 75
-```
-
-Use `--max-per-group 0` to keep every saved example in each label group.
-
-### Cache Directories
-
-The workflow is environment-agnostic. If a machine needs explicit cache paths, pass them directly:
-
-```bash
-python scripts/plot_custom_math_pca_trajectory.py \
-  --model-id google/gemma-4-E2B-it \
-  --data-file /path/to/math_data.jsonl \
-  --output-dir outputs/math_demo \
-  --hf-home /scratch/$USER/.cache/huggingface \
-  --datasets-cache /scratch/$USER/.cache/huggingface/datasets \
-  --transformers-cache /scratch/$USER/.cache/huggingface/transformers \
-  --mpl-cache /scratch/$USER/.cache/matplotlib
-```
-
-These flags set `HF_HOME`, `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, and `MPLCONFIGDIR` for the run. If omitted, the standard library defaults are used.
-
-### One-Command ArabicGSM8k EGY Run
-
-For a collaborator with a GPU who just needs to run both replacement settings and get the full postprocessed gallery in one shot, use:
+For a GPU machine, this is the main one-command run:
 
 ```bash
 PYTHONPATH=src python3 scripts/run_arabic_gsm8k_egy_pair.py \
@@ -227,53 +33,112 @@ PYTHONPATH=src python3 scripts/run_arabic_gsm8k_egy_pair.py \
   --output-dir outputs/arabic_gsm8k_qwen2_5_7b
 ```
 
-This runs both `all replacement` and `no replacement` for `dialect=EGY`, then writes the merged and postprocessed PCA plots automatically.
+What it does:
 
-### Outputs
+- uses dataset `afaji/ArabicGSM8k`
+- uses split `test`
+- filters `dialect=EGY`
+- runs both `all replacement` and `no replacement`
+- saves inference JSONL files
+- saves final-token residual-stream activations across layers
+- writes the PCA plot gallery automatically
 
-For `--output-dir outputs/math_demo`, the command writes:
+## Smaller Smoke Run
 
-- `outputs/math_demo/inference/custom_math_seed0.jsonl`: prompts, model outputs, parsed numeric answers, gold answers, correctness, and token metadata.
-- `outputs/math_demo/activations/custom_math_seed0_all_activations.npz`: final-generated-token residual-stream activations across layers.
-- `outputs/math_demo/plots/custom_math_trajectory_pca_correctness.png`: PCA trajectory plot.
-- when paired replacement subsets exist, additional postprocessed gallery plots are written under `outputs/.../plots/`.
-
-The plot treats each example as a residual-stream trajectory through layers. Green lines are correct examples, red lines are incorrect examples, circles mark the first layer state, squares mark the final layer state, and darker segments indicate later layer progression. Layers are normalized before PCA by default; pass `--no-layer-normalize` to disable that.
-
-## Tests
-
-Unit tests do not download Gemma:
+If you want a lighter first pass:
 
 ```bash
-pytest
+PYTHONPATH=src python3 scripts/run_arabic_gsm8k_egy_pair.py \
+  --hf-token "$HF_TOKEN" \
+  --model-id Qwen/Qwen3-0.6B \
+  --dtype float32 \
+  --device-map cpu \
+  --sample-size 50 \
+  --output-dir outputs/arabic_gsm8k_qwen3_0_6b_smoke
 ```
 
-Optional dataset contract tests check real dataset schemas and may require network or a populated Hugging Face cache:
+## Important Files
 
-```bash
-RUN_DATASET_CONTRACT_TESTS=1 pytest -m integration
-```
-
-The Gemma prompt path uses:
-
-```python
-processor.apply_chat_template(
-    messages,
-    tokenize=False,
-    add_generation_prompt=True,
-    enable_thinking=False,
-)
-```
-
-Thinking mode is intentionally disabled for every task.
+- `scripts/run_arabic_gsm8k_egy_pair.py`
+  Runs both subset settings in one command.
+- `scripts/plot_custom_math_postprocess.py`
+  Regenerates the PCA gallery from saved activations without rerunning inference.
+- `src/geometric_complexity_scaling/custom_math.py`
+  Dataset loading, filtering, inference logging, and activation saving.
+- `src/geometric_complexity_scaling/plotting.py`
+  PCA plotting and postprocessing gallery logic.
 
 ## Outputs
 
-- `inference/*.jsonl`: prompt, target, output, parsed answer, correctness, seed, row id, generated token metadata.
-- `activations/*.npz`: correct-example residual-stream arrays for geometry.
-- `metrics/*.csv`: per-task/per-seed/per-layer metrics.
-- `plots/*.png`: accuracy, retained correct counts, PCA, Isomap, LLE, intrinsic dimension, and curvature plots.
+For an output directory like `outputs/arabic_gsm8k_qwen2_5_7b`, the run writes:
 
-The semantic-pullback curvature is approximated by projecting residual states through a deterministic sampled subset of the model output embedding/unembedding directions. This keeps the experiment tractable while preserving a separate logit-space geometry probe from raw Euclidean residual curvature.
+- `inference/custom_math_all-replacement_dialect-egy_seed0.jsonl`
+- `inference/custom_math_no-replacement_dialect-egy_seed0.jsonl`
+- `activations/custom_math_all-replacement_dialect-egy_seed0_all_activations.npz`
+- `activations/custom_math_no-replacement_dialect-egy_seed0_all_activations.npz`
+- `plots/*.png`
 
-TriviaQA correctness uses official-style normalization, exact match over all answer aliases, and token F1. A fact answer is retained for geometry when exact match succeeds or its best alias F1 is at least 0.5; the raw score details are saved in each inference record.
+Each JSONL row includes:
+
+- `prompt`
+- `raw_output`
+- `parsed_answer`
+- `target`
+- `correct`
+- `generated_len`
+- `max_new_tokens`
+- `hit_max_new_tokens`
+- `source_row`
+
+Each activation file includes:
+
+- `activations`
+- `row_ids`
+- `correct`
+- `outcome_group`
+- `generated_lengths`
+
+## Plot Gallery
+
+When both subsets are present, the repo writes these comparison plots:
+
+- per-subset local PCA plot for `all replacement`
+- per-subset local PCA plot for `no replacement`
+- 4-line shared PCA comparison:
+  - `no replacement correct`
+  - `no replacement incorrect`
+  - `all replacement correct`
+  - `all replacement incorrect`
+- replacement-only comparison
+- correctness-only comparison
+- agreement-only comparison
+  Rows where both settings produce the same final parsed answer.
+- disagreement-only comparison
+  Rows where the two settings produce different final parsed answers.
+
+Agreement/disagreement uses the math scorer’s numeric equivalence on `parsed_answer`, not exact raw-text matching.
+
+## Rebuild Plots Without Rerunning Inference
+
+```bash
+PYTHONPATH=src python3 scripts/plot_custom_math_postprocess.py \
+  --all-replacement-activation outputs/arabic_gsm8k_qwen2_5_7b/activations/custom_math_all-replacement_dialect-egy_seed0_all_activations.npz \
+  --no-replacement-activation outputs/arabic_gsm8k_qwen2_5_7b/activations/custom_math_no-replacement_dialect-egy_seed0_all_activations.npz \
+  --output-dir outputs/arabic_gsm8k_qwen2_5_7b \
+  --plot-prefix custom_math_seed0_dialect-egy \
+  --max-per-group 75
+```
+
+Use `--max-per-group 0` to keep every saved example in each label group.
+
+## Notes
+
+- The current default longer generation budget is `512` new tokens.
+- The dataset config names use spaces:
+  - `all replacement`
+  - `no replacement`
+- The current workflow assumes the dataset columns:
+  - `ID`
+  - `question`
+  - `answer`
+  - `dialect`
