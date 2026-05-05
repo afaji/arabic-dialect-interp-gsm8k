@@ -201,6 +201,7 @@ def test_custom_pca_trajectory_gallery_writes_plot_suite(tmp_path):
         "custom_math_seed0_dialect-egy_replacement_comparison_trajectory_pca_correctness.png",
         "custom_math_seed0_dialect-egy_replacement_only_trajectory_pca.png",
         "custom_math_seed0_dialect-egy_correctness_only_trajectory_pca.png",
+        "custom_math_seed0_dialect-egy_replacement_correctness_inconsistent_only_trajectory_pca_correctness.png",
         "custom_math_seed0_dialect-egy_replacement_agreement_only_trajectory_pca.png",
         "custom_math_seed0_dialect-egy_replacement_disagreement_only_trajectory_pca.png",
     }

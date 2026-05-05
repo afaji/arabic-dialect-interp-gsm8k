@@ -254,6 +254,41 @@ def plot_custom_pca_trajectory_gallery(
     )
     written.append(correctness_only_path)
 
+    correctness_flip_payloads = _split_named_payloads_by_correctness_inconsistency(
+        full_payloads=full_payloads,
+        max_per_group=max_per_group,
+        random_seed=random_seed,
+    )
+    correctness_flip_path = plot_dir / f"{plot_prefix}_replacement_correctness_inconsistent_only_trajectory_pca_correctness.png"
+    correctness_flip_trajectories, correctness_flip_labels = _combine_named_payloads(
+        correctness_flip_payloads,
+        label_mode="subset_and_correctness",
+    )
+    correctness_flip_fit_trajectories = _concatenate_trajectories(
+        [payload["activations"] for payload in correctness_flip_payloads]
+    )
+    _plot_single_pca_trajectory(
+        trajectories=correctness_flip_trajectories,
+        labels=correctness_flip_labels,
+        output_path=correctness_flip_path,
+        title="Arabic GSM8K trajectories where correctness flips between settings (PCA, shared basis)",
+        PCA=decomposition.PCA,
+        plt=plt,
+        random_seed=random_seed,
+        normalize_layers=normalize_layers,
+        colors=REPLACEMENT_CORRECTNESS_COLORS,
+        legend_order=[
+            "all replacement correct",
+            "no replacement incorrect",
+            "no replacement correct",
+            "all replacement incorrect",
+        ],
+        line_styles=REPLACEMENT_CORRECTNESS_LINE_STYLES,
+        legend_ncol=3,
+        fit_trajectories=correctness_flip_fit_trajectories,
+    )
+    written.append(correctness_flip_path)
+
     agreement_payloads, disagreement_payloads = _split_named_payloads_by_output_agreement(
         full_payloads=full_payloads,
         max_per_group=max_per_group,
@@ -581,6 +616,7 @@ def _load_named_custom_activation(name: str, activation_path: str | Path) -> dic
     path = Path(activation_path)
     payload = np.load(path, allow_pickle=True)
     activations = payload["activations"].astype(np.float32)
+    correctness_labels = _labels_from_activation_payload(payload)
     row_ids = (
         [str(value) for value in payload["row_ids"].tolist()]
         if "row_ids" in payload
@@ -590,8 +626,9 @@ def _load_named_custom_activation(name: str, activation_path: str | Path) -> dic
         "name": name,
         "path": path,
         "activations": activations,
-        "correctness_labels": _labels_from_activation_payload(payload),
+        "correctness_labels": correctness_labels,
         "row_ids": row_ids,
+        "correctness_by_row_id": {row_id: label for row_id, label in zip(row_ids, correctness_labels, strict=False)},
         "parsed_answers_by_row_id": _load_parsed_answers_for_activation_path(path),
     }
 
@@ -677,6 +714,32 @@ def _split_named_payloads_by_output_agreement(
         for payload in full_payloads
     ]
     return agreement_payloads, disagreement_payloads
+
+
+def _split_named_payloads_by_correctness_inconsistency(
+    full_payloads: list[dict[str, object]],
+    max_per_group: int,
+    random_seed: int,
+) -> list[dict[str, object]]:
+    if len(full_payloads) < 2:
+        return []
+    shared_row_ids = set(full_payloads[0].get("row_ids", []))
+    for payload in full_payloads[1:]:
+        shared_row_ids &= set(payload.get("row_ids", []))
+    correctness_maps = [payload.get("correctness_by_row_id", {}) for payload in full_payloads]
+    inconsistent_row_ids = {
+        row_id
+        for row_id in shared_row_ids
+        if len({correctness_map.get(row_id) for correctness_map in correctness_maps}) > 1
+    }
+    return [
+        _sample_named_custom_activation(
+            _filter_named_custom_activation_by_row_ids(payload, inconsistent_row_ids),
+            max_per_group=max_per_group,
+            random_seed=random_seed,
+        )
+        for payload in full_payloads
+    ]
 
 
 def _load_parsed_answers_for_activation_path(activation_path: str | Path) -> dict[str, object]:

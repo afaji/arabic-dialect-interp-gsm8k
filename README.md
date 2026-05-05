@@ -109,6 +109,8 @@ When both subsets are present, the repo writes these comparison plots:
   - `no replacement incorrect`
   - `all replacement correct`
   - `all replacement incorrect`
+- correctness-inconsistent-only comparison
+  Rows where one setting is correct and the other is incorrect.
 - replacement-only comparison
 - correctness-only comparison
 - agreement-only comparison
